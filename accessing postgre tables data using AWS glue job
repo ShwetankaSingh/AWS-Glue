@@ -1,0 +1,23 @@
+# Pyspark code to access data from postgre sql database
+
+from pyspark.context import SparkContext
+from awsglue.context import GlueContext
+from awsglue.dynamicframe import DynamicFrame
+from awsglue.job import Job
+from pyspark.sql import DataFrame, Row
+
+glueContext = GlueContext(SparkContext.getOrCreate())
+
+# PosrgerSQL_node is dynamic frame
+PostgreSQL_node=glueContext.create_dynamic_frame.from_options(
+            connection_type="postgresql",
+            connection_options = {"useConnectionProperties": "true","sslmode":"disable","dbTable":tbl,"connectionName":conn_name},
+            transformation_ctx="PostgreSQL_node",
+        )
+curdataframe = PostgreSQL_node.toDF()
+
+
+# dbtable : tbl
+# tbl is name of table along with schema like "public.employee" where public is schema and employee is table name
+# here connectionName is conn_name, conn_name is jdbc connection which got created in Glue.
+# conn_name jdbc connection is containing host address of postgre db server along with its credentials.
