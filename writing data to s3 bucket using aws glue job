@@ -1,0 +1,54 @@
+from awsglue import DynamicFrame
+
+import datetime
+
+
+
+
+# generating path of s3 folder
+def getAmazonS3Path(tablename,rawBucket):
+    now = datetime.datetime.now()
+    year = now.year
+    month = now.month
+    day = now.day
+    hour = now.hour
+    myFolder = tablename
+    
+    myFolder = 'Testing/'+tablename
+
+        
+   
+    AmazonS3_path = (
+        "s3://"
+        + rawBucket
+        +"/"
+        + myFolder
+        + "/ingest_year="
+        + "{:0>4}".format(str(year))
+        + "/ingest_month="
+        + "{:0>2}".format(str(month))
+        + "/ingest_day="
+        + "{:0>2}".format(str(day))
+        + "/ingest_hour="
+        + "{:0>2}".format(str(hour))
+        + "/"
+    )
+    return AmazonS3_path
+
+
+
+
+#writing into s3 bucket 
+def write_dynamic_frame(cur_dataframe,cur_tablename,glueContext,rawBucket):
+    #converting to dynamic frame
+    final_dyf = DynamicFrame.fromDF(
+            cur_dataframe, glueContext, "final_dyf"
+        )
+    cur_dyf_selectFields = final_dyf.coalesce(1)
+    # logger.info("Writing into table name : " + cur_tablename)
+    AmazonS3_node = glueContext.write_dynamic_frame.from_options(frame=cur_dyf_selectFields,connection_type="s3",format="csv",connection_options={
+        "path": getAmazonS3Path(cur_tablename,rawBucket),
+        "partitionKeys": [],
+            }, #format_options={"withHeader" :True},
+        transformation_ctx="AmazonS3_node",)
+    return str(final_dyf.count())
