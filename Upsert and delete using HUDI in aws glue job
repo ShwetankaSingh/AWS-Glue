@@ -1,0 +1,57 @@
+from pyspark.sql.session import SparkSession
+
+spark = SparkSession.builder.config('spark.serializer','org.apache.spark.serializer.KryoSerializer').config('spark.sql.hive.convertMetastoreParquet','false').getOrCreate()
+
+# dataframe_IU is dataframe
+# recordkey is primary key column name
+# precombine is date time column which contains modieddate/commitdate of records
+# dbname is database whic is present inside aws glue data catalog
+def insertupdate(dataframeIU_f,tablename,recordkey,precombine):
+    print("Hudi format started for insert,update operations")
+    dataframeIU_f.write.format("org.apache.hudi") \
+         .option("hoodie.datasource.hive_sync.use_jdbc","false") \
+         .option("hoodie.table.name","HUDI_" + tablename) \
+         .option("hoodie.datasource.hive_sync.database",db_name) \
+         .option("hoodie.datasource.write.reconcile.schema","true") \
+         .option("hoodie.datasource.hive_sync.table","HUDI_" +tablename) \
+         .option("hoodie.datasource.hive_sync.enable","true") \
+         .option("hoodie.consistency.check.enabled","true") \
+         .option("hoodie.datasource.write.precombine.field",precombine) \
+         .option("hoodie.datasource.write.recordkey.field",recordkey) \
+         .option("hoodie.datasource.write.storage.type","COPY_ON_WRITE") \
+         .option("hoodie.datasource.write.operation", "upsert") \
+         .mode("Append") \
+         .save('s3a://'+destinationBucketname+'/'+ tablename)
+    print(tablename + " table Generated Successfully")
+
+
+def deletion(dataframeD_f,tablename,recordkey,precombine):
+    print("inside delete function")
+    print("Deleting record in Hudi table")
+    dataframeD_f.write.format("org.apache.hudi") \
+         .option("hoodie.table.name","HUDI_" + tablename) \
+         .option("hoodie.datasource.hive_sync.database",db_name) \
+         .option("hoodie.datasource.write.reconcile.schema","true") \
+         .option("hoodie.datasource.hive_sync.table","HUDI_" +tablename) \
+         .option("hoodie.delete.shuffle.parallelism", "20") \
+         .option("hoodie.datasource.write.precombine.field",precombine) \
+         .option("hoodie.datasource.write.recordkey.field",recordkey) \
+         .option("hoodie.datasource.write.Options.PARTITIONPATH_FIELD_OPT_KEY", precombine) \
+         .option("hoodie.datasource.write.Options.PAYLOAD_CLASS_OPT_KEY", "org.apache.hudi.EmptyHoodieRecordPayload") \
+         .option("hoodie.datasource.write.storage.type", "COPY_ON_WRITE") \
+         .option("hoodie.datasource.write.operation", "delete") \
+         .mode("Append") \
+         .save('s3a://'+destinationBucketname+'/'+ tablename)
+    logger.info(tablename + " record deleted successfully")
+
+
+# NOTE:
+# In job parameters add these two parameter
+# Key                          Value
+# --datalake-formats           hudi
+# --conf                       spark.serializer=org.apache.spark.serializer.KryoSerializer
+
+
+# reading HUDI generated data 
+outputdataframe=spark.sql("select * from databasename.tablename")
+outputdataframe.show()
